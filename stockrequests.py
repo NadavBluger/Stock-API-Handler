@@ -102,3 +102,5 @@ class TimeSeriesInterdayExtended(StockRequest):
             return self.process_scv_response(get(self.request_url).text)
         else:
             raise AttributeError("A request can not be preformed without a specification of a symbol")
+
+class

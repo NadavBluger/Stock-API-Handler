@@ -49,7 +49,7 @@ def loop_through_stocks(method):
 
 def send_stock(method, data):
     if method == "PUT":
-        return put("http://127.0.0.1:5000/API_Handler", json=data)
+        return put(f"http://127.0.0.1:5000/API_Handler,{data['Meta Data']['2. Symbol']}", json=data)
     elif method == "POST":
         return post("http://127.0.0.1:5000/API_Handler", json=data)
     else:
