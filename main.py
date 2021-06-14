@@ -1,72 +1,60 @@
 import time
-from stockrequests import TimeSeriesDailyRequest
-from requests import put, get, post
+import asyncio
+from stockrequests import TimeSeriesDailyRequest, ListingStatus
+from sending_methods import save_response_to_file
+from commons.loggers import TextFileLogger
+from commons.configurations import JSONFileConfiguration
+from commons.RabbitMQ import RabbitMQAgent
 from json import dumps
 
 
-req1 = TimeSeriesDailyRequest(outputsize="full")
-
-
-def get_stock_symbols():
+def get_stock_symbols(logger):
     """
     Aquires all stock symbols from the API
     :return: A list of all symbols
     """
-    stocks_data = get("https://www.alphavantage.co/query?function=LISTING_STATUS&apikey=0MM5MCP66HZMFZ8H").text
-    rows = stocks_data.split("\r\n")
-    rows.pop(0)
-    rows.pop()
-    stock_symbols = []
-    for row in rows:
-        stock_symbols.append(row.split(",")[0])
-    print(len(stock_symbols))
-    return stock_symbols
+    logger.log("Acquiring a list of all stock symbols", "DEBUG")
+    request = ListingStatus(logger=logger)
+    return request.preform_request()
 
 
-def save_response_to_file(response, symbol):
-    with open(".\\Bad Requests\\{}.json".format(symbol), mode='w') as f:
-        f.write(dumps(response))
-
-
-def loop_through_stocks(method):
-    symbols = get_stock_symbols()
+async def loop_through_stocks(method, agent, logger):
+    """
+    Loop through a list of tickers, get thier data from the api and send it forward
+    :param method: PUT or POST, POST is for the first run when all tickers are first requested
+    :param logger: a logger
+    :return:
+    """
+    symbols = get_stock_symbols(logger)
     time.sleep(12.001)  # the Api key is limited to 5 requests per minute
     for stock_symbol in symbols:
         start_time = time.time()
         response = req1.preform_request(stock_symbol)
-        if "Meta Data" in response.keys() and "Time Series (Daily)" in response.keys():
-            db_response = send_stock(method, response)
-            if db_response.status_code != 200:
-                print("DB operation was not successful")
-                save_response_to_file(response, stock_symbol)
-                # Implement a logger here
-        else:
-            print("Bad response received")
+        if "Meta Data" not in response.keys() or "Time Series (Daily)" not in response.keys():
             save_response_to_file(response, stock_symbol)
-            # Implement a logger here
-        time.sleep(12.001-(time.time()-start_time))  # the Api key is limited to 5 requests per minute
+            logger.log(f"Bad response was received for {stock_symbol} and was saved to file", "WARN")
+        await asyncio.sleep(12.001-(time.time()-start_time))  # the Api key is limited to 5 requests per minute
+        message = {"method": method, "data": response}
+        await agent.write(dumps(message))
 
 
-def send_stock(method, data):
-    if method == "PUT":
-        return put(f"http://127.0.0.1:5000/API_Handler,{data['Meta Data']['2. Symbol']}", json=data)
-    elif method == "POST":
-        return post("http://127.0.0.1:5000/API_Handler", json=data)
-    else:
-        raise ValueError("Method mus be PUT or POST")
-
-
-def main():
-    loop_through_stocks("POST")
+async def main(agent, logger):
+    await loop_through_stocks("POST", agent, logger)
     while True:
-        loop_through_stocks("PUT")
+        await loop_through_stocks("PUT", agent, logger)
 
 
 if __name__ == '__main__':
-    while True:
-        main()
-
-
-
-
-# check differance between data and JSON in PUT and POST methods
+    loop = asyncio.get_event_loop()
+    rabbit_config = JSONFileConfiguration(["credentials","host","output_exchanges","input_exchanges","input_queue"],
+                                   "./Configurations/RabbitMQConfiguration.json")
+    logger_config = JSONFileConfiguration(["level"], "./Configurations/LoggerConfiguration.json")
+    rabbit_agent = RabbitMQAgent(rabbit_config, loop)
+    logger_args = logger_config.__dict__.copy()
+    logger_args.pop("level")
+    logger_args.pop("needed_params")
+    logger_args.pop("params")
+    logger_args.pop("file_path")
+    text_logger = TextFileLogger(logger_config.level, **logger_args)
+    req1 = TimeSeriesDailyRequest(outputsize="full", logger=text_logger)
+    loop.run_until_complete(main(rabbit_agent, text_logger))

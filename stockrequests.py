@@ -13,7 +13,7 @@ class StockRequest:
         self.function = function
         self.arguments = request_arguments
         self.apikey = StockRequest.apikey
-        if request_arguments.keys() not in self._permitted_arg:
+        if request_arguments.keys() and request_arguments.keys() not in self._permitted_arg:
             wrong_arg = [k for k in request_arguments.keys() if k not in self._permitted_arg]
             self.logger.log(f"Arguments ({wrong_arg}) which do not fit requests type were given and will not be used",
                             "WARN")
@@ -103,4 +103,31 @@ class TimeSeriesInterdayExtended(StockRequest):
         else:
             raise AttributeError("A request can not be preformed without a specification of a symbol")
 
-class
+
+class ListingStatus(StockRequest):
+    _permitted_arg = []
+
+    def __init__(self, *, logger):
+        super(ListingStatus, self).__init__(function="LISTING_STATUS", logger=logger)
+
+    @staticmethod
+    def parse_response(stocks_data):
+        """
+        Parse the cvs file acquired by the request into a list of tickers
+        :param stocks_data: a list of all stock tickers
+        :return:
+        """
+        rows = stocks_data.split("\r\n")
+        rows.pop(0)
+        rows.pop()
+        stock_symbols = []
+        for row in rows:
+            stock_symbols.append(row.split(",")[0])
+        return stock_symbols
+
+    def preform_request(self, symbol=None):
+        return self.parse_response(get(self.request_url).text)
+
+
+if __name__ == '__main__':
+    pass
