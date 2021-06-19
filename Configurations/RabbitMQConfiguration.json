@@ -6,5 +6,5 @@
             ["Stock_API_out",{"type":"fanout", "durable": true}]
         ],
     "input_exchanges":[""],
-    "input_queue":["queueueue",{"durable":"true", "max-limit":1000}]
+    "input_queue":["",{}]
 }

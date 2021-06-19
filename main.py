@@ -22,6 +22,7 @@ async def loop_through_stocks(method, agent, logger):
     """
     Loop through a list of tickers, get thier data from the api and send it forward
     :param method: PUT or POST, POST is for the first run when all tickers are first requested
+    :param agent: A queue management broker agent tasked with sending the data once retrieved
     :param logger: a logger
     :return:
     """
@@ -33,7 +34,7 @@ async def loop_through_stocks(method, agent, logger):
         if "Meta Data" not in response.keys() or "Time Series (Daily)" not in response.keys():
             save_response_to_file(response, stock_symbol)
             logger.log(f"Bad response was received for {stock_symbol} and was saved to file", "WARN")
-        await asyncio.sleep(12.001-(time.time()-start_time))  # the Api key is limited to 5 requests per minute
+        await asyncio.sleep(12.001 - (time.time() - start_time))  # the Api key is limited to 5 requests per minute
         message = {"method": method, "data": response}
         await agent.write(dumps(message))
 
@@ -46,8 +47,8 @@ async def main(agent, logger):
 
 if __name__ == '__main__':
     loop = asyncio.get_event_loop()
-    rabbit_config = JSONFileConfiguration(["credentials","host","output_exchanges","input_exchanges","input_queue"],
-                                   "./Configurations/RabbitMQConfiguration.json")
+    rabbit_config = JSONFileConfiguration(["credentials", "host", "output_exchanges", "input_exchanges", "input_queue"],
+                                          "./Configurations/RabbitMQConfiguration.json")
     logger_config = JSONFileConfiguration(["level"], "./Configurations/LoggerConfiguration.json")
     rabbit_agent = RabbitMQAgent(rabbit_config, loop)
     logger_args = logger_config.__dict__.copy()

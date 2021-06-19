@@ -1,22 +1,17 @@
 from requests import put, post
-from aiokafka import AIOKafkaProducer as Producer
 from json import dumps
 
 
-async def send_stock_kafka(loop, state, data):
-    producer = Producer(loop=loop, bootstrap_servers='0.0.0.0:9092')
-    print(data['Meta Data']['2. Symbol'])
-    await producer.start()
-    try:
-        await producer.send_and_wait(f"API_Handler_{state}_Out", key={data['Meta Data']['2. Symbol']}, value=data)
-    finally:
-        await producer.stop()
-
-
 def send_stock_http(method, data):
+    """
+    Send the document gotten from the API to the Databse writer via HTTP
+    --Function no longer in use
+    :param method: The method which to use while sending
+    :param data: the api response to be sent
+    :return:
+    """
     if method == "PUT":
-        # what the hell is going in with the comma and symbol i don't know
-        response = put(f"http://127.0.0.1:5000/API_Handler,{data['Meta Data']['2. Symbol']}", json=data)
+        response = put(f"http://127.0.0.1:5000/API_Handler/,{data['Meta Data']['2. Symbol']}", json=data)
     elif method == "POST":
         response = post("http://127.0.0.1:5000/API_Handler", json=data)
     else:
@@ -25,6 +20,14 @@ def send_stock_http(method, data):
 
 
 def handle_db_response(response, stock_symbol):
+    """
+    Receive response from  the Database Writer and if the operation was not successful write the returned document
+    to file
+    --Function no longer in use
+    :param response: The Http Response from the Database Writer
+    :param stock_symbol: The stock's Ticker
+    :return:
+    """
     if response.status_code != 200:
         print("DB operation was not successful")
         save_response_to_file(response, stock_symbol)
