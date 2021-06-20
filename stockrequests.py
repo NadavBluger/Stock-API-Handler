@@ -1,11 +1,11 @@
+import aiohttp
 from operator import concat
-from requests import get
 from json import loads
 
 
 class StockRequest:
-    _permitted_arg = []  # implement
-    apikey = '0MM5MCP66HZMFZ8H'  # implement
+    _permitted_arg = []
+    apikey = '0MM5MCP66HZMFZ8H'
 
     def __init__(self, function, symbol=None, *, logger, **request_arguments):
         self.logger = logger
@@ -29,7 +29,7 @@ class StockRequest:
         return ''.join(concat(["https://www.alphavantage.co/query?", "function={}".format(self.function),
                                "&symbol={}".format(self.symbol), "&apikey={}".format(self.apikey)], arguments))
 
-    def preform_request(self, symbol=None):
+    async def preform_request(self, symbol=None):
         """
         preforms a http request to the API 
         :param symbol: the stock symbol
@@ -37,9 +37,14 @@ class StockRequest:
         """
         self.symbol = symbol or self.symbol
         if self.symbol:
-            return loads(get(self.request_url).text)
+            return loads(await self._get(self.request_url))
         else:
             raise AttributeError("A request can not be preformed without a specification of a symbol", "ERROR")
+
+    @staticmethod
+    async def _get(url):
+        async with aiohttp.ClientSession() as session:
+            return await (await session.get(url)).text()
 
     def __repr__(self):
         request_arguments = [k + ":" + v for k, v in self.arguments.items()]
@@ -91,7 +96,7 @@ class TimeSeriesInterdayExtended(StockRequest):
             self.arguments["slice"] = slice_
             yield self.preform_request()
 
-    def preform_request(self, symbol=None):
+    async def preform_request(self, symbol=None):
         """
         preforms a http request to the API
         :param symbol: the stock symbol
@@ -99,7 +104,7 @@ class TimeSeriesInterdayExtended(StockRequest):
         """
         self.symbol = symbol or self.symbol
         if self.symbol:
-            return self.process_scv_response(get(self.request_url).text)
+            return self.process_scv_response(await self._get(self.request_url))
         else:
             raise AttributeError("A request can not be preformed without a specification of a symbol")
 
@@ -125,8 +130,8 @@ class ListingStatus(StockRequest):
             stock_symbols.append(row.split(",")[0])
         return stock_symbols
 
-    def preform_request(self, symbol=None):
-        return self.parse_response(get(self.request_url).text)
+    async def preform_request(self, symbol=None):
+        return self.parse_response(await self._get(self.request_url))
 
 
 if __name__ == '__main__':
